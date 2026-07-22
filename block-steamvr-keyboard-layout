@@ -1,0 +1,57 @@
+// ==WindhawkMod==
+// @id              block-steamvr-keyboard-layout-fork
+// @name            Block SteamVR en-US Keyboard Layout - Fork
+// @description     Prevents SteamVR from adding the en-US keyboard layout
+// @version         1.0.0
+// @include         vrserver.exe
+// @include         steamtours.exe
+// @include         vrdashboard.exe
+// @include         vrmonitor.exe
+// ==/WindhawkMod==
+
+// ==WindhawkModReadme==
+/*
+# Block SteamVR en-US Keyboard Layout
+
+SteamVR silently calls `LoadKeyboardLayout("00000409", ...)` on startup,
+which adds an unwanted English (United States) keyboard layout to Windows.
+
+This mod hooks `LoadKeyboardLayoutW` in SteamVR processes and blocks
+any attempt to load the en-US (0x00000409) layout.
+*/
+// ==/WindhawkModReadme==
+
+#include <windhawk_utils.h>
+#include <windows.h>
+
+// 原始函数指针
+using LoadKeyboardLayoutW_t = decltype(&LoadKeyboardLayoutW);
+LoadKeyboardLayoutW_t LoadKeyboardLayoutW_Original;
+
+// Hook 函数
+HKL WINAPI LoadKeyboardLayoutW_Hook(LPCWSTR pwszKLID, UINT Flags) {
+    // 拦截 en-US 键盘布局 (00000409)
+    if (pwszKLID && _wcsicmp(pwszKLID, L"00000409") == 0) {
+        Wh_Log(L"Blocked LoadKeyboardLayout for en-US (00000409)");
+        // 返回一个假的 HKL 让调用者以为成功了，避免崩溃
+        return (HKL)(ULONG_PTR)0x04090409;
+    }
+    // 其他布局正常放行
+    return LoadKeyboardLayoutW_Original(pwszKLID, Flags);
+}
+
+BOOL Wh_ModInit() {
+    Wh_Log(L"Block SteamVR Keyboard Layout mod initialized");
+
+    Wh_SetFunctionHook(
+        (void*)LoadKeyboardLayoutW,
+        (void*)LoadKeyboardLayoutW_Hook,
+        (void**)&LoadKeyboardLayoutW_Original
+    );
+
+    return TRUE;
+}
+
+void Wh_ModUninit() {
+    Wh_Log(L"Block SteamVR Keyboard Layout mod unloaded");
+}
